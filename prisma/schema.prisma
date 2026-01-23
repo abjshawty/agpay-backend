@@ -1,0 +1,444 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+type AdressType {
+  mail  String?
+  phone String?
+}
+
+type Auth {
+  cancreate Boolean
+  canupdate Boolean
+  canprint  Boolean
+  canlist   Boolean
+  candelete Boolean
+}
+
+model Account {
+  id         String                        @id @default(auto()) @map("_id") @db.ObjectId
+  name       String
+  rib        String
+  partnerId  String?                       @db.ObjectId
+  partner    Partner?                      @relation(fields: [partnerId], references: [id])
+  societyId  String?                       @db.ObjectId
+  society    Society?                      @relation(fields: [societyId], references: [id])
+  bankId     String                        @db.ObjectId
+  bank       Bank                          @relation(fields: [bankId], references: [id])
+  type       String
+  status     String?                       @default("active")
+  userId     String                        @db.ObjectId
+  user       User                          @relation(fields: [userId], references: [id])
+  createdBy  String                        @db.ObjectId
+  createdAt  DateTime?                     @default(now())
+  updatedAt  DateTime?                     @default(now()) @updatedAt
+  SourcedRTO ResumeTransactionsOperateur[] @relation("sourceRTO")
+  DestRTO    ResumeTransactionsOperateur[] @relation("destRTO")
+}
+
+model Approbation {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  status     String
+  date       DateTime
+  iduser     String?
+  file       String?
+  commentary String?
+  detailId   String    @unique @db.ObjectId
+  detail     Detail    @relation(fields: [detailId], references: [id])
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @default(now()) @updatedAt
+
+  @@map("Approbation")
+}
+
+model Audit {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  action    String
+  entity    String
+  entityId  String
+  userId    String?   @db.ObjectId
+  timestamp DateTime  @default(now())
+  user      User?     @relation(fields: [userId], references: [id], name: "UserAudits")
+  createdAt DateTime? @default(now())
+  updatedAt DateTime? @default(now()) @updatedAt
+
+  @@map("Audit")
+}
+
+model AuditV2 {
+  id       String  @id @default(auto()) @map("_id") @db.ObjectId
+  category String
+  module   String
+  target   String?
+  userId   String? @db.ObjectId
+  message  String?
+
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
+model Bank {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  name      String    @unique
+  code      String    @unique
+  status    String    @default("active")
+  createdBy String    @db.ObjectId
+  createdAt DateTime? @default(now())
+  updatedAt DateTime? @default(now()) @updatedAt
+  accounts  Account[]
+  user      User      @relation(fields: [createdBy], references: [id])
+}
+
+model CodeSociety {
+  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  code         String
+  idSociety    String        @db.ObjectId
+  society      Society       @relation(fields: [idSociety], references: [id])
+  partner      Partner       @relation(fields: [idPartner], references: [id], onDelete: Cascade)
+  idPartner    String        @db.ObjectId
+  transactions Transaction[]
+  createdAt    DateTime?     @default(now())
+  updatedAt    DateTime?     @default(now()) @updatedAt
+
+  @@unique(code)
+}
+
+model Config {
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  inactivity      Int
+  accountDormancy Int
+  createdAt       DateTime? @default(now())
+  updatedAt       DateTime? @default(now()) @updatedAt
+
+  @@map("Config")
+}
+
+model DailyFinancialClosure {
+  id                  String    @id @default(auto()) @map("_id") @db.ObjectId
+  date                DateTime
+  montant             Float
+  nbreTransaction     Int
+  details             Detail[]
+  operatorId          String    @db.ObjectId
+  operator            Partner   @relation(fields: [operatorId], references: [id])
+  status              Int       @default(0)
+  source_account      String?   @db.ObjectId
+  destination_account String?   @db.ObjectId
+  message             String?
+  createdAt           DateTime? @default(now())
+  updatedAt           DateTime? @default(now()) @updatedAt
+
+  @@unique([date, operatorId])
+  @@map("DailyFinancialClosure")
+}
+
+model DfcApproval {
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  operateurId         String   @db.ObjectId
+  date                DateTime
+  societyId           String?  @db.ObjectId
+  approvedBy          String   @db.ObjectId
+  approval            Boolean
+  source_account      String?  @db.ObjectId
+  destination_account String?  @db.ObjectId
+  message             String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([operateurId, date, societyId])
+  @@map("DfcApproval")
+}
+
+model Detail {
+  id             String                @id @default(auto()) @map("_id") @db.ObjectId
+  operateur      String
+  nbrTransaction Int
+  montantRecolte Float
+  dfcId          String                @db.ObjectId
+  dfc            DailyFinancialClosure @relation(fields: [dfcId], references: [id])
+  approbation    Approbation?
+  createdAt      DateTime?             @default(now())
+  updatedAt      DateTime?             @default(now()) @updatedAt
+
+  @@unique([dfcId, operateur])
+  @@map("Detail")
+}
+
+model Feature {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  auth        Auth
+  description String?
+  Profile     Profil?   @relation(fields: [profileId], references: [id])
+  profileId   String?   @db.ObjectId
+  createdAt   DateTime? @default(now())
+  updatedAt   DateTime? @default(now()) @updatedAt
+
+  @@map("Feature")
+}
+
+model File {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  b64       String
+  createdAt DateTime? @default(now())
+  status    String?   @default("active")
+  updatedAt DateTime? @default(now()) @updatedAt
+}
+
+model Partner {
+  id                     String                  @id @default(auto()) @map("_id") @db.ObjectId
+  name                   String                  @unique
+  code                   CodeSociety[]           @relation
+  logo                   String?
+  accounts               Account[]
+  color                  String
+  userId                 String[]                @db.ObjectId
+  users                  User[]                  @relation("PartnerUsers")
+  adress                 AdressType
+  dailyFinancialClosures DailyFinancialClosure[]
+  status                 String                  @default("active")
+  createdAt              DateTime?               @default(now())
+  updatedAt              DateTime?               @default(now()) @updatedAt
+  transactions           Transaction[]
+  createdBy              String?                 @db.ObjectId
+
+  ResumeTransactionsOperateur ResumeTransactionsOperateur[]
+}
+
+model Password {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  status    String?   @default("active")
+  password  String
+  createdAt DateTime  @default(now())
+  expireAt  DateTime?
+  userId    String?   @db.ObjectId
+  user      User?     @relation(fields: [userId], references: [id])
+}
+
+model Profil {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  features  Feature[]
+  users     User[]
+  type      ExtOrInt
+  status    String    @default("active")
+  createdBy String?   @db.ObjectId
+  createdAt DateTime? @default(now())
+  updatedAt DateTime? @default(now()) @updatedAt
+
+  @@map("Profile")
+}
+
+model ResumeTransactionsJour {
+  id                String                        @id @default(auto()) @map("_id") @db.ObjectId
+  date              DateTime
+  montant           Float
+  nombreTransaction Int
+  societyId         String                        @db.ObjectId
+  society           Society                       @relation(fields: [societyId], references: [id])
+  details           ResumeTransactionsOperateur[]
+  sv2               Float
+  sv3               Float
+  createdAt         DateTime?                     @default(now())
+  updatedAt         DateTime?                     @default(now()) @updatedAt
+
+  @@unique([date, societyId])
+  @@index([societyId, date])
+}
+
+model ResumeTransactionsOperateur {
+  id                     String                 @id @default(auto()) @map("_id") @db.ObjectId
+  date                   DateTime
+  montant                Float
+  nombreTransaction      Int
+  message                String?
+  source_account         String?                @db.ObjectId
+  destination_account    String?                @db.ObjectId
+  status                 Int                    @default(0)
+  operateurId            String                 @db.ObjectId
+  societyId              String                 @db.ObjectId
+  approvedBy             String?                @db.ObjectId
+  sv2                    Float
+  sv3                    Float
+  society                Society                @relation(fields: [societyId], references: [id])
+  source                 Account?               @relation(name: "sourceRTO", fields: [source_account], references: [id])
+  destination            Account?               @relation(name: "destRTO", fields: [destination_account], references: [id])
+  approver               User?                  @relation(fields: [approvedBy], references: [id])
+  operateur              Partner                @relation(fields: [operateurId], references: [id])
+  ResumeTransactionsJour ResumeTransactionsJour @relation(fields: [date, societyId], references: [date, societyId], onDelete: Cascade)
+  createdAt              DateTime?              @default(now())
+  updatedAt              DateTime?              @default(now()) @updatedAt
+
+  @@unique([operateurId, date, societyId])
+  @@index([societyId, date, operateurId])
+}
+
+model Society {
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  codeSociety   String        @unique
+  userId        String        @db.ObjectId
+  user          User          @relation(fields: [userId], references: [id])
+  linkedPartner CodeSociety[]
+  accounts      Account[]
+  status        String        @default("active")
+  createdAt     DateTime?     @default(now())
+  updatedAt     DateTime?     @default(now()) @updatedAt
+  transactions  Transaction[]
+  createdBy     String        @default("SUPERADMIN")
+
+  ResumeTransactionsJour ResumeTransactionsJour[]
+
+  ResumeTransactionsOperateur ResumeTransactionsOperateur[]
+
+  @@index([status])
+  @@index([name])
+}
+
+model Test {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  lorem     String
+  createdAt DateTime? @default(now())
+  updatedAt DateTime? @default(now()) @updatedAt
+}
+
+model Token {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  userEmail String
+  token     String    @unique
+  expiry    DateTime
+  createdAt DateTime? @default(now())
+  updatedAt DateTime? @default(now()) @updatedAt
+}
+
+model TokenX {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  token     String    @unique
+  expiry    DateTime
+  createdAt DateTime? @default(now())
+  updatedAt DateTime? @default(now()) @updatedAt
+}
+
+model Transaction {
+  id                   String            @id @default(auto()) @map("_id") @db.ObjectId
+  canal                String            @default("Mobile")
+  referenceClient      String
+  referenceContrat     String
+  referenceTransaction String?
+  facture              String
+  numeroRecu           String
+  operateurId          String            @db.ObjectId
+  statutOperations     String
+  details              String?
+  dateDePaiement       DateTime
+  montant              Float
+  dateFlux             DateTime
+  source               String
+  societyId            String?           @db.ObjectId
+  codeSocietyId        String            @db.ObjectId
+  status               TransactionStatus
+  NameSociety          String? // Nom de la société
+  Code_Id              String? // ID pour effectuer le "insert if not exists"
+
+  operateur   Partner     @relation(fields: [operateurId], references: [id])
+  society     Society?    @relation(fields: [societyId], references: [id])
+  codeSociety CodeSociety @relation(fields: [codeSocietyId], references: [id])
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([numeroRecu, operateurId])
+  @@index([dateFlux])
+  @@index([societyId])
+  @@index([operateurId])
+  @@index([status])
+  @@index([statutOperations])
+  @@index([codeSocietyId])
+  @@index([numeroRecu])
+  @@index([NameSociety])
+  @@index([societyId, dateFlux])
+  @@index([operateurId, dateFlux])
+  @@index([NameSociety, operateurId, statutOperations])
+  @@index([societyId, operateurId, dateFlux])
+  @@index([operateurId, societyId, dateFlux])
+  @@index([societyId, dateFlux, status])
+  @@index([societyId, dateFlux, source])
+  @@index([NameSociety, dateFlux])
+  @@map("Transaction")
+}
+
+model User {
+  id                          String                        @id @default(auto()) @map("_id") @db.ObjectId
+  username                    String?                       @unique
+  email                       String                        @unique
+  keycloakId                  String?                       @unique
+  lastname                    String?
+  firstname                   String?
+  matricule                   String?
+  department                  String?
+  college                     String?
+  numeroFiche                 String?
+  lastLoginDate               DateTime?
+  startDate                   DateTime                      @default(now())
+  expireDate                  DateTime?
+  expiredOnDate               DateTime?
+  userSessions                userSession[]
+  type                        ExtOrInt                      @default(INTERNAL)
+  status                      String?                       @default("active")
+  role                        String?                       @default("admin")
+  isEmailConfirmed            Boolean?                      @default(false)
+  profileId                   String?                       @db.ObjectId
+  profile                     Profil?                       @relation(fields: [profileId], references: [id])
+  passwordIds                 String[]                      @db.ObjectId
+  password                    Password[]
+  societyId                   String[]                      @db.ObjectId
+  societies                   Society[]
+  partnerId                   String?                       @db.ObjectId
+  partner                     Partner?                      @relation(fields: [partnerId], references: [id], name: "PartnerUsers", onDelete: Restrict)
+  createdAt                   DateTime?                     @default(now())
+  updatedAt                   DateTime?                     @default(now()) @updatedAt
+  audits                      Audit[]                       @relation("UserAudits")
+  Account                     Account[]
+  ResumeTransactionsOperateur ResumeTransactionsOperateur[]
+  createdBy                   String?                       @db.ObjectId
+  AuditV2                     AuditV2[]
+  Bank                        Bank[]
+
+  @@map("User")
+}
+
+model userSession {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  startDate DateTime  @default(now())
+  token     String    @unique
+  userId    String    @db.ObjectId
+  user      User      @relation(fields: [userId], references: [id])
+  status    String?   @default("active")
+  duration  DateTime
+  createdAt DateTime? @default(now())
+  updatedAt DateTime? @default(now()) @updatedAt
+}
+
+enum TransactionStatus {
+  Analyzing
+  Rejected
+  Approved
+}
+
+enum ExtOrInt {
+  EXTERNAL
+  INTERNAL
+}
