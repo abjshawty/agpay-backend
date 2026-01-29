@@ -122,7 +122,8 @@ const routes: FastifyPluginCallback = (
     },
   });
 
-  fastify.get("/paginate/:page", {
+  // TODO: Rewrite this route and associated functions to optimize performance
+  fastify.get("/paginate/:page", { // Route to paginate RTJs
     schema: {
       tags: ["RTJ"],
       querystring: {
@@ -136,13 +137,14 @@ const routes: FastifyPluginCallback = (
         required: ["societe"],
       },
     },
-    preHandler: checkAuth,
+    preHandler: checkAuth, // Check authentication
     handler: async (request: FastifyRequest<{ Params: { page: number; }, Querystring: { societe: string, query: string, montant: number, dateFrom: string, dateTo: string; }; }>, reply: FastifyReply) => {
-      const auth = await authorization(request.user, moduleName, "list");
+      const auth = await authorization(request.user, moduleName, "list"); // Check authorization
       if (!auth) return reply.status(403).send({ message: "Accès non autorisé" });
-      const userData = request.user as { id: string, iat: number; };
-      const { societe, query, montant, dateFrom, dateTo } = request.query;
-      const result = await service.getAll(userData, societe, request.params.page, query, montant, dateFrom, dateTo);
+      const userData = request.user as { id: string, iat: number; }; // Extract user data from JWT token
+      const { societe, query, montant, dateFrom, dateTo } = request.query; // Extract query parameters
+      const result = await service.getAll(userData, societe, request.params.page, query, montant, dateFrom, dateTo); // Pass parameters to service, to get a page of data
+      // Log the action
       await logV2(
         "Consultation",
         "DFCs",

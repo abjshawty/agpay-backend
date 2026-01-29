@@ -27,6 +27,7 @@ class Service {
         }
     }
 
+    // TODO: Rewrite this function to optimize performance
     async getAll (userData: { id: string, iat: number; }, societe: string, page: number, query: string, montant: number, dateFrom: string, dateTo: string) {
         try {
             const rtjs = await this.repo.getAll(userData, societe, page, query, montant, dateFrom, dateTo);
@@ -111,4 +112,5 @@ class Service {
         return 1;
     }
 }
+
 export default new Service();
